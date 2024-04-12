@@ -1,60 +1,66 @@
 import fastify from "fastify";
 
 import z from "zod";
-import { PrismaClient} from '@prisma/client';
-import { generateSlug } from "./utils/generate-slug";
+import { serializerCompiler, validatorCompiler,jsonSchemaTransform, ZodTypeProvider } from 'fastify-type-provider-zod'
+import { createEvent } from "./route/create-event";
+import { registerForEvent } from "./route/register-for-event";
+import { getEvents } from "./route/get-events";
+import { getAttendeesBadge } from "./route/get-attendees-badge";
+import { checkIn } from "./route/check-in";
+import { getEventsAttendees } from "./route/get-event-attendees";
 
 
-const prisma = new PrismaClient({
-  log: ["query"],
+import fastifySwagger from "@fastify/swagger";
+import fastifySwaggerUi from "@fastify/swagger-ui";
+import { errorHandler } from "./erro-handler";
+import fastifyCors from "@fastify/cors";
+export const app = fastify()
+
+app.register(fastifyCors, {
+  origin: "*" //qualquer front-end pode consumir minha api porque está em desenvolvimento
 })
 
-const app = fastify()
+app.register(fastifySwagger, {
+  swagger: {
+    consumes: ['application/json'],
+    produces: ['application/json'],
+    info: {
+      title: 'pass.in',
+      description: 'Especificações da API para o back-end da aplicação pass.in construída durante o NLW Unite da Rocketseat.',
+      version: '1.0.0'
+    },
+  },
+  transform: jsonSchemaTransform,
+})
 
+app.register(fastifySwaggerUi, {
+  routePrefix: '/docs',
+})
 
-app.post("/events",  async(request, reply)=>{
-  const createEventSchema = z.object({
-    title: z.string().min(4),
-    details: z.string().nullable(),
-    maximumAttendees: z.number().int().positive().nullable()
+app.setErrorHandler(errorHandler)
 
-  })
+app.setValidatorCompiler(validatorCompiler);
+app.setSerializerCompiler(serializerCompiler);
 
-  const data = createEventSchema.parse(request.body) //validação dos dados
+app.register(createEvent) // chamando a função para criar evento
+app.register(registerForEvent)
+app.register(getEvents)
+app.register(getAttendeesBadge)
+app.register(checkIn)
+app.register(getEventsAttendees)
 
-
-  const slug = generateSlug(data.title)
-
-  const eventWithSameSlug = await prisma.event.findUnique({
-    where: {
-      slug,
+app.withTypeProvider<ZodTypeProvider>().get("/", {
+  schema:{
+    response:{
+      200: z.string()
     }
-  })
-
-  if(eventWithSameSlug !== null){
-    throw new Error("Another event same title already exists")
   }
-
-   const event = await prisma.event.create({
-    data:{
-      title: data.title,
-      details: data.details,
-      maximumAttendees: data.maximumAttendees,
-      slug
-    }
-    
-  })
-
-  return reply.status(201).send({eventId : event})
-})
-
-
-app.get("/", () => {
+},() => {
   return "Hello Luis, api node :)"
 })
 
 
 
-app.listen({port: 3333}).then(() => {
+app.listen({port: 3333, host: "0.0.0"}).then(() => {
   console.log("HTTP server running")
 })

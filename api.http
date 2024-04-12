@@ -2,8 +2,7 @@ POST http://localhost:3333/events
 Content-Type: application/json
 
 {
-  "title": "Event Http Slug",
-  "details": "Criando api com node",
+  "title":"Dell",
+  "details":"Criando api com node",
   "maximumAttendees": 100
-
-}'
+}
